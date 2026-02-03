@@ -22,6 +22,8 @@ import shutil   #文件操作
 import uuid     #生成唯一ID
 import os       #操作系统接口
 import logging  #日志记录
+import tempfile #临时文件
+import time     #时间处理
 
 #创建应用
 app = FastAPI()
@@ -78,36 +80,29 @@ def health_check():
 
 # ========== 上传接口 ==========
 @app.post("/upload")
-def upload_image(file: UploadFile = File(...)):
-    #创建图片存储目录
-    os.makedirs("storage", exist_ok=True)
-    #保存原始文件
-    tmp_filename = f"{uuid.uuid4()}.jpg"
-    tmp_path = os.path.join("storage", tmp_filename)
-    #保存
-    with open(tmp_path, "wb") as f:
-        shutil.copyfileobj(file.file, f)
-
+async def upload_image(file: UploadFile = File(...)):
     try:
-        # 验证图片
-        with Image.open(tmp_path) as img:
-            img = img.convert("RGB")
-            final_filename = f"{uuid.uuid4()}.jpg"
-            final_path = os.path.join("storage", final_filename)
-
-            img.save(final_path, format="JPEG", quality=95)
-    except Exception as e:
-        if os.path.exists(tmp_path):
-            os.remove(tmp_path)
-        raise AppException("IMAGE_INVALID",f"图片无法解析或格式不支持:{str(e)}")
-    finally:
-        #删除临时文件
-        if os.path.exists(tmp_path):
-            os.remove(tmp_path)
-    return {
+        # 1. 读取文件内容
+        contents = await file.read()
+        
+        # 2. 使用内存验证图片（不需要保存到文件）
+        from io import BytesIO
+        img = Image.open(BytesIO(contents))
+        img = img.convert("RGB")
+        
+        # 在/tmp目录创建文件，这是Render唯一可靠的位置
+        timestamp = int(time.time())
+        filename = f"/tmp/upload_{timestamp}_{uuid.uuid4().hex[:8]}.jpg"
+        img.save(filename, format="JPEG", quality=95)
+        
+        # 4. 返回临时文件路径（在Render上可以短期使用）
+        return {
             "status": "success",
-            "image_path": final_path
+            "image_path": filename  # 临时路径，可以工作几小时
         }
+        
+    except Exception as e:
+        raise AppException("IMAGE_INVALID", f"图片无法解析或格式不支持:{str(e)}")
 
 # ========== 分析接口 ==========
 #添加响应模型进行验证返回格式是否正确
@@ -121,8 +116,13 @@ def analyze_image(
             "IMAGE_NOT_FOUND","图片路径不存在"
         )
     
-    #调用人脸分析逻辑
-    return analyze_by_scene(
-        image_path=image_path,
-        scene=scene
-    )
+    try:
+        result = analyze_by_scene(image_path=image_path, scene=scene)
+        return result
+    finally:
+        # ✅ 分析完成后立即清理文件
+        try:
+            if image_path.startswith('/tmp/'):
+                os.unlink(image_path)
+        except:
+            pass  # 忽略清理错误
