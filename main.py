@@ -31,9 +31,18 @@ app = FastAPI()
 # ========== CORS 跨域配置==========
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],    #允许所有来源（开发时要限制）
-    allow_methods=["*"],    #允许所有HTTP方法
-    allow_headers=["*"],    #允许所有请求
+    # 明确列出允许的源
+    allow_origins=[
+        "https://nextself.live",
+        "https://www.nextself.live",
+        "http://localhost",        # 保留本地开发
+        "http://localhost:8000",
+    ],
+    allow_credentials=True,        # 如果需要cookie/session则设为True
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],  # 明确列出方法
+    allow_headers=["*"],           # 或明确列出需要的headers
+    expose_headers=["*"],          # 允许前端访问的响应头
+    max_age=600,                   # 预检请求缓存时间（秒）
 )
 
 # ========== 日志 ==========
