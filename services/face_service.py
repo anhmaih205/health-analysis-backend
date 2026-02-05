@@ -190,28 +190,28 @@ def analyze_face(image_path: str) -> dict:
         # 更新最后调用时间
         last_call_time = time.time()
 
-#异常处理
-    try:
-        with open(image_path, "rb") as f:
-            resp = requests.post(
-                FACEPP_SKIN_API,
-                data={
-                    "api_key": FACEPP_API_KEY,
-                    "api_secret": FACEPP_API_SECRET
-                },
-                files={"image_file": f},
-                timeout=30
-            )
-    except requests.RequestException as e:
-        raise AppException("FACEPP_REQUEST_FAILED", str(e))
+    #异常处理
+        try:
+            with open(image_path, "rb") as f:
+                resp = requests.post(
+                    FACEPP_SKIN_API,
+                    data={
+                        "api_key": FACEPP_API_KEY,
+                        "api_secret": FACEPP_API_SECRET
+                    },
+                    files={"image_file": f},
+                    timeout=30
+                )
+        except requests.RequestException as e:
+            raise AppException("FACEPP_REQUEST_FAILED", str(e))
 
-    if resp.status_code != 200:
-        raise AppException("FACEPP_HTTP_ERROR", resp.text)
+        if resp.status_code != 200:
+            raise AppException("FACEPP_HTTP_ERROR", resp.text)
 
-    result = resp.json()
+        result = resp.json()
 
-    if "error_message" in result:
-        raise AppException("FACEPP_API_ERROR", result["error_message"])
+        if "error_message" in result:
+            raise AppException("FACEPP_API_ERROR", result["error_message"])
 
     skin = result.get("result", {})
 
