@@ -87,51 +87,40 @@ def health_check():
         "service": "health-analysis-backend"
     }
 
-# ========== 上传接口 ==========
-@app.post("/upload")
-async def upload_image(file: UploadFile = File(...)):
+
+# ========== 合并上传+分析接口 ==========
+#添加响应模型进行验证返回格式是否正确
+@app.post("/analyze",response_model=FaceAnalyzeResponse)
+async def analyze_image(
+    file:UploadFile=File(...),    #接收图片路径
+    scene: str = Form("face")  # 分析场景设置
+): 
     try:
-        # 1. 读取文件内容
+        # 1️⃣ 读文件到内存
         contents = await file.read()
-        
-        # 2. 使用内存验证图片（不需要保存到文件）
         from io import BytesIO
         img = Image.open(BytesIO(contents))
         img = img.convert("RGB")
-        
-        # 在/tmp目录创建文件，这是Render唯一可靠的位置
-        timestamp = int(time.time())
-        filename = f"/tmp/upload_{timestamp}_{uuid.uuid4().hex[:8]}.jpg"
-        img.save(filename, format="JPEG", quality=95)
-        
-        # 4. 返回临时文件路径（在Render上可以短期使用）
-        return {
-            "status": "success",
-            "image_path": filename  # 临时路径，可以工作几小时
-        }
-        
-    except Exception as e:
-        raise AppException("IMAGE_INVALID", f"图片无法解析或格式不支持:{str(e)}")
-
-# ========== 分析接口 ==========
-#添加响应模型进行验证返回格式是否正确
-@app.post("/analyze",response_model=FaceAnalyzeResponse)
-def analyze_image(
-    image_path: str = Form(...),    #接收图片路径
-    scene: str = Form("face")  # 分析场景设置
-):
-    if not os.path.exists(image_path):
-        raise AppException(
-            "IMAGE_NOT_FOUND","图片路径不存在"
+        # 2️⃣ 保存到 /tmp
+        tmp_path = f"/tmp/upload_{uuid.uuid4().hex}.jpg"
+        img.save(tmp_path, format="JPEG", quality=95)
+        # 3️⃣ 调用分析
+        result = analyze_by_scene(
+            image_path=tmp_path,
+            scene=scene
         )
-    
-    try:
-        result = analyze_by_scene(image_path=image_path, scene=scene)
         return result
+
+    except AppException:
+        raise
+    except Exception as e:
+        logging.exception("Analyze failed")
+        raise AppException("ANALYZE_FAILED", str(e))
+    
     finally:
         # ✅ 分析完成后立即清理文件
         try:
-            if image_path.startswith('/tmp/'):
-                os.unlink(image_path)
+            if 'tmp_path' in locals() and os.path.exists(tmp_path):
+                os.unlink(tmp_path)
         except:
             pass  # 忽略清理错误
