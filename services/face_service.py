@@ -2,6 +2,9 @@
 
 import os
 import requests
+import time
+from tenacity import retry, wait_exponential, stop_after_attempt, retry_if_exception_type, before_sleep_log
+import logging
 from exceptions import AppException
 from config import IS_DEV
 
@@ -10,6 +13,10 @@ FACEPP_API_KEY = os.getenv("FACEPP_API_KEY")
 FACEPP_API_SECRET = os.getenv("FACEPP_API_SECRET")
 #调用URL
 FACEPP_SKIN_API = "https://api-cn.faceplusplus.com/facepp/v1/skinanalyze"
+
+# 设置日志
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # 工具函数-->数据映射字典，将返回的value转换为中文描述
 BOOLEAN_MAP = {
@@ -161,6 +168,9 @@ def analyze_face(image_path: str) -> dict:
     if not FACEPP_API_KEY or not FACEPP_API_SECRET:
         raise AppException("FACEPP_CONFIG_ERROR", "Face++ API Key 未配置")
 
+    import time
+    time.sleep(3.0)  # 每个请求等待3秒
+    
 #异常处理
     try:
         with open(image_path, "rb") as f:
