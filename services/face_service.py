@@ -3,10 +3,14 @@
 import os
 import requests
 import time
-from tenacity import retry, wait_exponential, stop_after_attempt, retry_if_exception_type, before_sleep_log
+import threading
 import logging
 from exceptions import AppException
 from config import IS_DEV
+
+# 全局锁，确保同一时间只有一个 Face++ 调用
+facepp_lock = threading.Lock()
+last_call_time = 0
 
 #从环境变量中读取API密钥
 FACEPP_API_KEY = os.getenv("FACEPP_API_KEY")
@@ -168,8 +172,23 @@ def analyze_face(image_path: str) -> dict:
     if not FACEPP_API_KEY or not FACEPP_API_SECRET:
         raise AppException("FACEPP_CONFIG_ERROR", "Face++ API Key 未配置")
 
-    import time
-    time.sleep(1.5)  # 每个请求等待1.5秒
+    # ========== 使用锁确保串行执行 ==========
+    with facepp_lock:
+        # 计算距离上次调用的时间
+        current_time = time.time()
+        time_since_last = current_time - last_call_time
+        
+        # 如果距离上次调用太近，等待更久
+        if time_since_last < 8.0:  # 至少间隔8秒
+            wait_time = 8.0 - time_since_last
+            print(f"等待 {wait_time:.1f} 秒以避免并发限制")
+            time.sleep(wait_time)
+        else:
+            # 至少等待3秒
+            time.sleep(3.0)
+        
+        # 更新最后调用时间
+        last_call_time = time.time()
 
 #异常处理
     try:
@@ -181,7 +200,7 @@ def analyze_face(image_path: str) -> dict:
                     "api_secret": FACEPP_API_SECRET
                 },
                 files={"image_file": f},
-                timeout=15
+                timeout=30
             )
     except requests.RequestException as e:
         raise AppException("FACEPP_REQUEST_FAILED", str(e))
