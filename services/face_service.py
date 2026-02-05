@@ -169,8 +169,8 @@ def analyze_face(image_path: str) -> dict:
         raise AppException("FACEPP_CONFIG_ERROR", "Face++ API Key 未配置")
 
     import time
-    time.sleep(3.0)  # 每个请求等待3秒
-    
+    time.sleep(1.5)  # 每个请求等待1.5秒
+
 #异常处理
     try:
         with open(image_path, "rb") as f:
