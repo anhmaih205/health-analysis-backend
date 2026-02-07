@@ -166,6 +166,7 @@ def generate_health_advice(skin_type_value,analysis):
 # 主逻辑
 #满足必要条件后才能调用API
 def analyze_face(image_path: str) -> dict:
+    global last_call_time
     if not os.path.exists(image_path):
         raise AppException("IMAGE_NOT_FOUND", "图片不存在")
 
@@ -191,27 +192,27 @@ def analyze_face(image_path: str) -> dict:
         last_call_time = time.time()
 
     #异常处理
-        try:
-            with open(image_path, "rb") as f:
-                resp = requests.post(
-                    FACEPP_SKIN_API,
-                    data={
-                        "api_key": FACEPP_API_KEY,
-                        "api_secret": FACEPP_API_SECRET
-                    },
-                    files={"image_file": f},
-                    timeout=30
-                )
-        except requests.RequestException as e:
-            raise AppException("FACEPP_REQUEST_FAILED", str(e))
+    try:
+        with open(image_path, "rb") as f:
+            resp = requests.post(
+                FACEPP_SKIN_API,
+                data={
+                    "api_key": FACEPP_API_KEY,
+                    "api_secret": FACEPP_API_SECRET
+                },
+                files={"image_file": f},
+                timeout=30
+            )
+    except requests.RequestException as e:
+        raise AppException("FACEPP_REQUEST_FAILED", str(e))
 
-        if resp.status_code != 200:
-            raise AppException("FACEPP_HTTP_ERROR", resp.text)
+    if resp.status_code != 200:
+        raise AppException("FACEPP_HTTP_ERROR", resp.text)
 
-        result = resp.json()
+    result = resp.json()
 
-        if "error_message" in result:
-            raise AppException("FACEPP_API_ERROR", result["error_message"])
+    if "error_message" in result:
+        raise AppException("FACEPP_API_ERROR", result["error_message"])
 
     skin = result.get("result", {})
 
@@ -277,8 +278,9 @@ def analyze_face(image_path: str) -> dict:
             "base_care":health_info["base_care"],
             "targeted_advice":health_info["targeted_advice"]
         },
-        "disclaimer":"本结果基于AI图像分析，仅供护肤参考，不构成医疗诊断。"
-        "如有严重皮肤问题，请咨询专业医生。"
+        "disclaimer":(
+            "本结果基于AI图像分析，仅供护肤参考，不构成医疗诊断。"
+            "如有严重皮肤问题，请咨询专业医生。")
     }
 
     if IS_DEV:
