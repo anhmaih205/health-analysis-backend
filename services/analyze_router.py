@@ -1,5 +1,6 @@
 #场景路由分发器
 
+import time
 #from backend.services.scalp.scalp_service import analyze_scalp_image
 from services.body_service import analyze_body
 from services.face_service import analyze_face
