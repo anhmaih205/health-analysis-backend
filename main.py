@@ -79,6 +79,16 @@ async def global_exception_handler(request: Request, exc: Exception):
         }
     )
 
+@app.exception_handler(AppException)
+async def app_exception_handler(request: Request, exc: AppException):
+    logging.warning(f"AppException: {exc.code} : {exc.message}")
+
+    return JSONResponse(
+        status_code=exc.http_status,
+        content=exc.to_dict()
+    )
+
+
 # ========== 健康检查 ==========
 @app.get("/health")
 def health_check():
@@ -115,7 +125,11 @@ async def analyze_image(
         raise
     except Exception as e:
         logging.exception("Analyze failed")
-        raise AppException("ANALYZE_FAILED", str(e))
+        raise AppException(
+            code="ANALYZE_FAILED",
+            message="图片分析失败，请重试"
+        )
+
     
     finally:
         # ✅ 分析完成后立即清理文件

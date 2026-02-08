@@ -5,6 +5,8 @@ import time
 from services.body_service import analyze_body
 from services.face_service import analyze_face
 from exceptions import AppException
+from exceptions import AppException
+from error_mapper import map_face_error
 
 def analyze_by_scene(scene:str,image_path:str) ->dict:
     scene = scene.lower()
